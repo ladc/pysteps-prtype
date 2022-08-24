@@ -44,6 +44,7 @@ metadata_inca['yorigin'] = 'upper'
 
 
 # ---------------------------------------------------------------------------
+# PLOT
 from pysteps.utils.reprojection import reproject_grids
 
 filenames = []
@@ -112,7 +113,7 @@ metadata_nwc['cartesian_unit'] = 'km'
 print('done!')
 
 
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- maybe do this after the interpolation!
 # Reproject
 # r_nwc has a extra dimension for members r_nwc[index,i,:,:]
 # let's use the first one for now
@@ -125,8 +126,86 @@ r_reprojected, metadata_reprojected = reproject_grids(R_inca, r_nwc[0, 0, :, :],
 
 # PLOT the reprojected thing! next!
 # for i in range(r_reprojected.shape[0]):
-filenames.append(worker(r_reprojected, metadata_reprojected, 0))
+#filenames.append(worker(r_reprojected, metadata_reprojected, 0))
 
+
+
+
+# ---------------------------------------------------------------------------
+# Linear interpolation function
+
+from scipy import interpolate
+
+# MAYBE consider to return only 1 grid
+
+# IMPROVE by building the result matrix during interpolation calculation loop!
+# SEPARATE in two different functions (utils):
+#   -Dummy interpolation
+#   -change the parameters to receive the x_start, y_start.. as parameters (default = 0), end = just len()
+#       (def grid_interpolation(numpyGridList, timeStep, timeBase=60, row_extent=[60, 651], col_extent=[60, 661] (0,0) (0,0)):
+#       maybe the indexes can be a parameter also like = [0, 5, 10, .... 60].. or maybe not, depends on the index selection (if starts at 10?)
+
+def grid_interpolation(numpyGridList, timeStep, timeBase=60, findReprojectedData=True, incaDimensions=[591, 601]):
+    """
+    numpyGridList:
+        Numpy list of 2-D grids for each hour (INCA)
+    timeStep:
+        time steps considered for interpolation
+    timeBase:
+        Every hour (60 min)
+    findReprojectedData:
+        Find the index of the 0,0 corner of the original INCA file in the reprojected grid (smaller grid)
+    incaDimensions:
+        Dimensions of the INCA grid
+    ----
+
+    Return:
+        Returns a list of 3D numpy interpolation matrix
+    """
+
+    # Find start index of the non nan value over the reprojection grid (to loop over the smaller GRIB grid only)
+    # get indexes FUNCTION
+    if findReprojectedData:
+        for i in range(numpyGridList.shape[1]):
+            if not all(np.isnan(numpyGridList[0, i, :])):
+                x_start = i
+                break
+        for i in range(numpyGridList.shape[2]):
+            if not all(np.isnan(numpyGridList[0, :, i])):
+                y_start = i
+                break
+
+    # Calculate end index
+    x_end = numpyGridList.shape[1] - (numpyGridList.shape[1] - (incaDimensions[0] + x_start))
+    y_end = numpyGridList.shape[2] - (numpyGridList.shape[2] - (incaDimensions[1] + y_start))
+    #
+
+    interpolationPoints = int(timeBase / timeStep)
+    time_point_range = np.arange(0, (timeBase+timeStep), timeStep)
+    inter_x1 = 0
+    inter_x2 = timeBase
+    gridTemplate = [[[float("nan") for k in range(interpolationPoints + 1)] for i in range(numpyGridList.shape[1])] for j
+                       in range(numpyGridList.shape[2])]
+    gridTemplate = np.array(gridTemplate)
+    interpolationList = []
+
+    for g in range(1, numpyGridList.shape[0]):
+        print('Calculating linear interpolation for index', g-1, ' to ', g)
+        interpolationGrid = np.copy(gridTemplate)
+        for i in range(x_start, x_end):
+            for j in range(y_start, y_end):
+                interpolationFunction = interpolate.interp1d([inter_x1, inter_x2], [numpyGridList[g-1][i, j], numpyGridList[g][i, j]])
+                interpolationGrid[i, j] = interpolationFunction(time_point_range)
+        interpolationList.append(interpolationGrid)
+    print('Done')
+
+    return interpolationList
+
+
+# Test
+# interpolationResult = grid_interpolation(r_reprojected[0:2], timeStep=5)
+# interpolationResult[0][210, 210, 0] == r_reprojected[0, 210, 210]
+# interpolationResult[0][210, 210, 12] == r_reprojected[1, 210, 210]
 
 
 # --------------------------------------------------------------------------
@@ -147,81 +226,40 @@ topo_reprojected, topo_metadata_reprojected = reproject_grids(np.array([inca_top
 #filenames.append(worker(topo_reprojected, topo_metadata_reprojected, 0))
 
 
-# ---------------------------------------------------------------------------
-# Linear interpolation
 
-# example!
-from scipy import interpolate
+# --------------------------------------------------------------------------
+# calculate the interpolation points (index selection between inca and pysteps) using the timestamps as index from the pysteps
 
-# x = r_reprojected[0, 200, 200]
-# y = r_reprojected[1, 200, 200]
-# f = interpolate.interp1d([0, 60], [r_reprojected[0, 200, 200], r_reprojected[1, 200, 200]])
-# xnew = np.arange(5, 65, 5)
-# for i in xnew:
-#     print(f(i))
+# How to determine the starting point , we should only use a index seq and determine the right grid by timestamp in metadata_nwc
+
+timeBase = 60
+timeStep = 5
 
 
-### This should be a function that receives as parameter the reprojection matrix ###
+time_step_index = [metadata_nwc['timestamps'][i].minute for i in range(len(metadata_nwc['timestamps']))]
+inca_interValue_indexing = np.arange(0, 65, 5) # np.arange(0, (timeBase + timeStep), timeStep)
+inca_indexing = np.arange(0, len(inca_interValue_indexing), 1)
+common_index = np.where(inca_interValue_indexing==time_step_index[0])[0][0]
 
-# Find start index of the non nan value over the reprojection
-for i in range(r_reprojected.shape[1]):
-    if not all(np.isnan(r_reprojected[0, i, :])):
-        x_start = i
-        break
+# Loop over
+for i in range(len(metadata_nwc['timestamps'])):
+    incaGrid = interpolationResult[0][:,:,i + common_index]     # interpolation 0
+    precipGrid = r_nwc[0, i-common_index, :, :]                 # CONSIDERING ONLY THE FIRST MEMBER! = 0
 
-for i in range(r_reprojected.shape[2]):
-    if not all(np.isnan(r_reprojected[0, :, i])):
-        y_start = i
-        break
 
-# Create interpolations point by point in r_interpolation matrix
-# Interpolation grid list
-#r_interpolation = [[[float("nan") for i in range(r_reprojected.shape[1])] for j in range(r_reprojected.shape[2])] for t in range(r_reprojected.shape[0]-1)]
-# Interpolation grid 3-D
-#r_interpolation = [[[float("nan")] for i in range(r_reprojected.shape[1])] for j in range(r_reprojected.shape[2])]
-r_interpolation = [[[float("nan") for k in range(12)] for i in range(r_reprojected.shape[1])] for j in range(r_reprojected.shape[2])]
-r_interpolation = np.array(r_interpolation)
 
-# Time profile
-# from datetime import datetime
-# now1 = datetime.now().time()
 
-# Calculate interpolation cube for R_inca
-time_point_range = [int(i) for i in metadata_nwc['leadtimes'] % 60][0:12]
-inter_x1 = 0
-inter_x2 = 60
 
-t = 1  # slice index
-for i in range(x_start, (R_inca.shape[1] + x_start)):
-    for j in range(y_start, (R_inca.shape[2] + y_start)):
-        interpolationFunction = interpolate.interp1d([inter_x1, inter_x2], [r_reprojected[t - 1, i, j], r_reprojected[t, i, j]])  # how to assign this function
-        r_interpolation[i][j] = interpolationFunction(time_point_range)
-print('DONE', sep='')
 
-# TEST
-# r_reprojected[0, 200, 200]
-# r_reprojected[1, 200, 200]
-# r_interpolation[0][200][200](np.arange(0, 65, 5))
-# r_interpolation[200,200]
+if time_step_index[10] == 0:
+    # re-calculate the interpolations from inca to the next hour
+else:
+    interpolationResult[0].[:,:, time_step_index[0]]
 
-# m = np.array([[1,2,3],[4,5,6],[7,8,9]])
-# f = np.array([[1,0,0],[0,1,0],[0,0,1]])
-# m[f == 1] = 100
-
-# Let's use the time (x) as interpolation parameter
 time_point = [int(i) for i in metadata_nwc['leadtimes'] % 60]
 #r_interpolation[200][200](time_point[0:12])
 
 
-for i in range(x_start, (R_inca.shape[1] + x_start)):
-    for j in range(y_start, (R_inca.shape[2] + y_start)):
-        r_interpolation[i][j]()
-
-
-if time_point[i] == 0:  # update t = t + 1
-    # Recalculate the interpolation function
-else:
-    #
 
 
 
