@@ -13,8 +13,10 @@ import pysteps
 from pysteps.visualization import plot_precip_field, quiver
 
 filename  = r'C:\Users\talen\Desktop\Student JOB\Data\INCA-BE example files\08\precip\PT_FC_INCA.grb'
-startdate = datetime.datetime.strptime('202201080000', "%Y%m%d%H%M")
-dir_gif   = r'C:\Users\talen\Desktop\Student JOB\Data\gifs'
+startdate = datetime.datetime.strptime('202201081500', "%Y%m%d%H%M")
+
+
+dir_gif = r'C:\Users\talen\Desktop\Student JOB\Data\gifs'
 
 # Keys to extract from the GRIB messages
 keys = ['Nx', 'Ny', 'latitudeOfFirstGridPointInDegrees', 'longitudeOfFirstGridPointInDegrees', 'earthIsOblate',
@@ -56,7 +58,7 @@ def worker(R_seq, metadata, i):
   plot_precip_field(R_seq[i, :, :], geodata=metadata, title=str(i)) # , units='mm', ptype='depth')
   plt.suptitle(title)
   plt.tight_layout()
-  filename = f'{i}.png'
+  filename = f'{i} - ' + startdate.strftime("%Y-%m-%d %H%M") + '.png'
   #  filenames.append(filename)
   plt.savefig(os.path.join(dir_gif, filename), dpi=72)
   plt.close()
@@ -83,7 +85,7 @@ print('done!')
 r_reprojected, metadata_reprojected = reproject_grids(R_inca, r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
 
 #for i in range(R_inca.shape[0]):
-filenames.append(worker(R_inca,metadata_inca, 0))
+filenames.append(worker(r_reprojected, metadata_inca, 0))
 
 
 

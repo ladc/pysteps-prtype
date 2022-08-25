@@ -342,9 +342,7 @@ class IncaGribImporter:
                 except ValueError as err:
                     print(err)
                     return {}
-                messageMatrix = np.flip(messageMatrix)
-                for i in range(messageMatrix.shape[0]):
-                    messageMatrix[i, :] = np.flip(messageMatrix[i, :])
+                messageMatrix = messageMatrix[::-1, :]  # Reorientation
                 messageData[idx]['Grid'] = messageMatrix
             self.reader.next_message()
             idx = idx + 1
