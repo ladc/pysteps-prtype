@@ -1,6 +1,4 @@
 
-# ----------------------------------# ----------------------------------# ----------------------------------
-# plot PT INCA FILE
 
 from IncaGribImport import IncaGribImporter
 
@@ -12,11 +10,26 @@ import matplotlib.pyplot as plt
 import pysteps
 from pysteps.visualization import plot_precip_field, quiver
 
-filename  = r'C:\Users\talen\Desktop\Student JOB\Data\INCA-BE example files\08\precip\PT_FC_INCA.grb'
+# ---------------------------------------------------------------------------
+# Plots
+def worker(R_seq, metadata, i):
+  title = 'INCA ZS ' + startdate.strftime("%Y-%m-%d %H:%M") + ' - ' + str(i)
+  fig = plt.figure(figsize=(15, 15))
+  fig.add_subplot(1, 1, 1 )
+  plot_precip_field(R_seq[i, :, :], geodata=metadata, title=str(i)) # , units='mm', ptype='depth')
+  plt.suptitle(title)
+  plt.tight_layout()
+  filename = f'{i} - ' + startdate.strftime("%Y-%m-%d %H%M") + '.png'
+  #  filenames.append(filename)
+  plt.savefig(os.path.join(dir_gif, filename), dpi=72)
+  plt.close()
+  return filename
+
+# ----------------------------------# ----------------------------------# ----------------------------------
+
+filename = r'C:\Users\talen\Desktop\Student JOB\Data\INCA-BE example files\08\precip\PT_FC_INCA.grb'
 startdate = datetime.datetime.strptime('202201081500', "%Y%m%d%H%M")
-
-
-dir_gif = r'C:\Users\talen\Desktop\Student JOB\Data\gifs'
+dir_gif = r'C:\Users\talen\Desktop\Student JOB\Data\gifs\incaPtype'
 
 # Keys to extract from the GRIB messages
 keys = ['Nx', 'Ny', 'latitudeOfFirstGridPointInDegrees', 'longitudeOfFirstGridPointInDegrees', 'earthIsOblate',
@@ -29,7 +42,6 @@ incaDictionary = importer.retrieve_grib_data(filename=filename, metadata_keys=ke
 
 # Transform to a list of grids
 R_inca = np.empty(shape=(len(incaDictionary['Messages'].keys()), incaDictionary['Messages'][1]['Grid'].shape[0], incaDictionary['Messages'][1]['Grid'].shape[1]))
-
 for i in range(len(R_inca)):
     R_inca[i,:,:] = incaDictionary['Messages'][i+1]['Grid']
 
@@ -42,28 +54,7 @@ metadata_inca['x1'] = 360000.0
 metadata_inca['y1'] = 350000.0
 metadata_inca['x2'] = 960000.0
 metadata_inca['y2'] = 940000.0
-#metadata_inca['yorigin'] = 'lower'
 metadata_inca['yorigin'] = 'upper'
-
-
-# ---------------------------------------------------------------------------
-# PLOT!
-filenames = []
-
-# 2 Plots
-def worker(R_seq, metadata, i):
-  title = 'INCA Z0 ' + startdate.strftime("%Y-%m-%d %H:%M") + ' - ' + str(i)
-  fig = plt.figure(figsize=(15, 15))
-  fig.add_subplot(1, 1, 1 )
-  plot_precip_field(R_seq[i, :, :], geodata=metadata, title=str(i)) # , units='mm', ptype='depth')
-  plt.suptitle(title)
-  plt.tight_layout()
-  filename = f'{i} - ' + startdate.strftime("%Y-%m-%d %H%M") + '.png'
-  #  filenames.append(filename)
-  plt.savefig(os.path.join(dir_gif, filename), dpi=72)
-  plt.close()
-  return filename
-
 
 
 # ---------------------------------------------------------------------------
@@ -85,9 +76,8 @@ print('done!')
 r_reprojected, metadata_reprojected = reproject_grids(R_inca, r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
 
 #for i in range(R_inca.shape[0]):
-filenames.append(worker(r_reprojected, metadata_inca, 0))
-
-
+# filenames = []
+#filenames.append(worker(r_reprojected, metadata_nwc, 0))
 
 
 
@@ -106,6 +96,6 @@ for i in range(inca_topo_grid.shape[0]):
 topo_reprojected, topo_metadata_reprojected = reproject_grids(np.array([inca_topo_grid]), r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
 
 # plot
-filenames.append(worker(topo_reprojected, topo_metadata_reprojected, 0))
+#filenames.append(worker(topo_reprojected, topo_metadata_reprojected, 0))
 
 
