@@ -133,7 +133,7 @@ def plot_precipType_field(
             precipType, ax, colorscale, categoryNr, extent, x_grid=x_grid, y_grid=y_grid
         )
 
-    plt.title(title)
+    plt.title(title, loc='center', fontsize=25)
 
     # add colorbar
     if colorbar:
@@ -146,7 +146,7 @@ def plot_precipType_field(
             cbar.ax.set_yticklabels('')
             cbar.ax.tick_params(size=0)
             cbar.ax.set_yticks([i + .5 for i in clevs][:-1], minor=True)
-            cbar.ax.set_yticklabels(clevs_str[:-1], minor=True)
+            cbar.ax.set_yticklabels(clevs_str[:-1], minor=True, fontsize=15)
     cbar.set_label(cBarLabel)
 
     if geodata is None or axis == "off":

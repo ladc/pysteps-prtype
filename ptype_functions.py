@@ -1,4 +1,3 @@
-
 # Import
 from IncaGribImport import IncaGribImporter
 
@@ -10,6 +9,7 @@ import matplotlib.pyplot as plt
 from pysteps.visualization import plot_precip_field, quiver
 from visualization.precipitationTypeFields import plot_precipType_field
 
+
 # Dictionary to matrix function
 def inca_dictionary_to_3Dmatrix(incaDict):
     resultMatrix = np.empty(shape=(
@@ -20,13 +20,12 @@ def inca_dictionary_to_3Dmatrix(incaDict):
     return resultMatrix
 
 
-# Plot function
-def worker(R_seq, metadata, i, startdate, dir_gif):
-    title = 'INCA ' + startdate.strftime("%Y-%m-%d %H:%M") + ' - ' + str(i)
+def plot_ptype(ptype_seq, metadata, i, date_time, dir_gif):
+    title = 'INCA ' + date_time.strftime("%Y-%m-%d %H:%M") + ' - ' + str(i)
     fig = plt.figure(figsize=(15, 15))
     fig.add_subplot(1, 1, 1)
-    plot_precip_field(R_seq[i, :, :], geodata=metadata, title=str(i))  # , units='mm', ptype='depth')
-    plt.suptitle(title)
+    plot_precipType_field(ptype_seq[i, :, :], geodata=metadata, title=title, colorscale="pysteps", categoryNr=4)
+    plt.suptitle('Precipitation Type', fontsize=30)
     plt.tight_layout()
     filename = f'{i}.png'
     #  filenames.append(filename)
@@ -34,12 +33,26 @@ def worker(R_seq, metadata, i, startdate, dir_gif):
     plt.close()
     return filename
 
-# PLOT!
-# for i in range(R_inca.shape[0]):
-# filenames = []
-# filenames.append(worker(R_inca, metadata_inca, 0))
 
-# Linear interpolation function
+def members_mean_matrix_at(membersData):
+    """Function to calculate the members average over time
+
+    membersData:
+        3D matrix composed by [members, grid dimension 1, grid dimension 2]
+    """
+
+    if len(membersData.shape) != 3:
+        raise ValueError("Invalid members data shape (expected [:,:,:]) " + str(membersData.shape))
+
+    meanMatrix = np.zeros((membersData.shape[1], membersData.shape[2]))
+    for member_idx in range(membersData.shape[0]):
+        meanMatrix = meanMatrix + membersData[member_idx, :, :]
+    meanMatrix = meanMatrix / membersData.shape[0]
+    print('Mean member matrix done!')
+
+    return meanMatrix
+
+
 def grid_interpolation(numpyGridStart, numpyGridEnd, timeStep=5, timeBase=60):
     """ Time interpolation between 2 2D grids
 
@@ -62,12 +75,13 @@ def grid_interpolation(numpyGridStart, numpyGridEnd, timeStep=5, timeBase=60):
         raise ValueError("ERROR: Grids have different dimensions")
 
     interPoints = np.arange(0, (timeBase + timeStep), timeStep)
-    interpolationGrid = np.zeros((numpyGridStart.shape[0], numpyGridStart.shape[1], len(interPoints)))
+    interpolationGrid = np.zeros((len(interPoints), numpyGridStart.shape[0], numpyGridStart.shape[1]))
     interpolationGrid[:, :, :] = np.nan
 
     print('Calculating linear interpolation..')
     for i in range(len(interPoints)):
-        interpolationGrid[:, :, i] = numpyGridStart + ((numpyGridEnd - numpyGridStart) / interPoints[-1]) * interPoints[i]
+        interpolationGrid[i, :, :] = numpyGridStart + ((numpyGridEnd - numpyGridStart) / interPoints[-1]) * interPoints[
+            i]
     print('Done')
 
     return interpolationGrid
@@ -120,4 +134,3 @@ def calculate_precip_type(incaZnow, incaTemp, incaGroundTemp, precipGrid, topogr
     result[freezingMask] = 4
 
     return result
-
