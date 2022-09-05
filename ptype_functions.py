@@ -20,12 +20,12 @@ def inca_dictionary_to_3Dmatrix(incaDict):
     return resultMatrix
 
 
-def plot_ptype(ptype_seq, metadata, i, date_time, dir_gif):
-    title = 'INCA ' + date_time.strftime("%Y-%m-%d %H:%M") + ' - ' + str(i)
+def plot_ptype(ptype_grid, metadata, i, date_time, dir_gif, categoryNr=4):
+    title = 'Precipitation type ' + date_time.strftime("%Y-%m-%d %H:%M") #+ ' - ' + str(i)
     fig = plt.figure(figsize=(15, 15))
     fig.add_subplot(1, 1, 1)
-    plot_precipType_field(ptype_seq[i, :, :], geodata=metadata, title=title, colorscale="pysteps", categoryNr=4)
-    plt.suptitle('Precipitation Type', fontsize=30)
+    plot_precipType_field(ptype_grid, geodata=metadata, title=title, colorscale="pysteps", categoryNr=categoryNr)
+    #plt.suptitle('Precipitation Type', fontsize=30)
     plt.tight_layout()
     filename = f'{i}.png'
     #  filenames.append(filename)
@@ -34,7 +34,7 @@ def plot_ptype(ptype_seq, metadata, i, date_time, dir_gif):
     return filename
 
 
-def members_mean_matrix_at(membersData):
+def calculate_members_mean(membersData):
     """Function to calculate the members average over time
 
     membersData:
@@ -48,9 +48,46 @@ def members_mean_matrix_at(membersData):
     for member_idx in range(membersData.shape[0]):
         meanMatrix = meanMatrix + membersData[member_idx, :, :]
     meanMatrix = meanMatrix / membersData.shape[0]
-    print('Mean member matrix done!')
+    #print('Mean member matrix done!')
 
     return meanMatrix
+
+
+def create_timestamp_indexing(nrOfIncaMessages, startDateTime, timeStep=5, timeBase=60):
+    """create a timestamp array for INCA indexing
+
+    nrOfIncaMessages:
+        Number of INCA available messages
+
+    startDateTime:
+        Start date and time
+
+    timeStep:
+        Defines the size of the time step for interpolation
+
+    timeBase:
+        Time between messages in minutes (INCA have a message every hour: 60)
+
+    ___
+    Return:
+          Array of timestamps similar to pysteps timestamps
+    """
+
+    if nrOfIncaMessages < 2:
+        raise ValueError("Not enough interpolation messages, should be at least 2")
+
+    result = []
+    timestamp = startDateTime
+    interPoints = np.arange(0, (timeBase + timeStep), timeStep)
+
+    for i in range(nrOfIncaMessages-1):
+        for j in interPoints[:-1]:
+            result.append(timestamp)
+            timestamp = timestamp + datetime.timedelta(minutes=timeStep)
+
+    result.append(timestamp)
+    return np.array(result)
+
 
 
 def grid_interpolation(numpyGridStart, numpyGridEnd, timeStep=5, timeBase=60):
@@ -78,13 +115,63 @@ def grid_interpolation(numpyGridStart, numpyGridEnd, timeStep=5, timeBase=60):
     interpolationGrid = np.zeros((len(interPoints), numpyGridStart.shape[0], numpyGridStart.shape[1]))
     interpolationGrid[:, :, :] = np.nan
 
-    print('Calculating linear interpolation..')
+    print('Calculating linear interpolation..', end=' ')
     for i in range(len(interPoints)):
         interpolationGrid[i, :, :] = numpyGridStart + ((numpyGridEnd - numpyGridStart) / interPoints[-1]) * interPoints[
             i]
     print('Done')
 
     return interpolationGrid
+
+
+
+def generate_inca_interpolations(inca_reprojected_data, nwc_timestamps, startdate, timeStep=5, timeBase=60, dateFormat='%Y%m%d%H%M'):
+    """Generate a sub-selection of INCA interpolation matrix for all messages available from INCA grib file
+
+    inca_reprojected_data:
+        INCA reprojected data.
+
+    inca_timestamps:
+        Array of timestamps every timeSteps period, for all grib messages available.
+
+    nwc_timestamps:
+        Array of timestamps available from PYSTEPS metadata ['timestamps']
+
+    ----
+    Return:
+        3D matrix with depth equal to the common matching timestamps between INCA and PYSTEPS.
+
+    """
+
+    # Create a timestamp index array for INCA interpolation matrix
+    inca_timestamps = create_timestamp_indexing(inca_reprojected_data.shape[0], startdate, timeStep=timeStep,
+                                                timeBase=timeBase)
+    # Convert metadata_nwc['timestamps'] to datetime
+    nwc_ts = [datetime.datetime.strptime(ts.strftime(dateFormat), dateFormat) for ts in nwc_timestamps]
+
+    inca_start = np.where(inca_timestamps == nwc_ts[0])[0][0]  # this is not safe add an IF check .shape[0]
+    inca_end = np.where(inca_timestamps == nwc_ts[-1])[0][0] + 1  # this is not safe
+    timestamp_selection = inca_timestamps[inca_start:inca_end]  # to be returned
+
+    # interpolation indexes
+    resultMatrix = np.zeros((inca_start + len(timestamp_selection), inca_reprojected_data.shape[1], inca_reprojected_data.shape[2]))
+    result_idx = 0
+
+    # loop over the messages
+    for m in range(1, inca_reprojected_data.shape[0]):
+        if result_idx < resultMatrix.shape[0]:
+            # calculate interpolations
+            interpolationMatrix = grid_interpolation(inca_reprojected_data[m-1], inca_reprojected_data[m], timeStep=timeStep, timeBase=timeBase)
+            interp_idx = 0
+            # Add the interpolation values to the result matrix
+            while interp_idx < interpolationMatrix.shape[0] and (result_idx < resultMatrix.shape[0]):
+                resultMatrix[result_idx, :, :] = interpolationMatrix[interp_idx, :, :]
+                result_idx = result_idx + 1
+                interp_idx = interp_idx + 1
+
+    return resultMatrix[inca_start:], timestamp_selection
+
+# inca_reprojected_data[1,60:62, 60:62] == resultMatrix[12, 60:62, 60:62]
 
 
 def calculate_precip_type(incaZnow, incaTemp, incaGroundTemp, precipGrid, topographyGrid, DZML=100., TT0=2., TG0=0.,
@@ -134,3 +221,22 @@ def calculate_precip_type(incaZnow, incaTemp, incaGroundTemp, precipGrid, topogr
     result[freezingMask] = 4
 
     return result
+
+
+def get_reprojected_indexes(reprojectedGrid):
+    """reprojected INCA grids contains a frame of NAN values, this function returns the start and end indexes
+    of the inca grid in the reprojected grid
+
+    reprojectedGrid:
+        INCA reprojected Grid
+
+    Returns:
+        x y indexes of inca reprojected grid over pysteps dimensions
+    """
+
+    x_start = np.where(~np.isnan(reprojectedGrid))[0][0]
+    x_end = np.where(~np.isnan(reprojectedGrid))[0][-1]
+    y_start = np.where(~np.isnan(reprojectedGrid))[-1][0]
+    y_end = np.where(~np.isnan(reprojectedGrid))[-1][-1]
+
+    return x_start, x_end, y_start, y_end

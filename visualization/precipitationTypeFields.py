@@ -234,6 +234,8 @@ def _get_colorlist(colorscale="pysteps", categoryNr=4):
     ----------
     colorscale : str
         Which colorscale to use (BOM-RF3, pysteps, STEPS-BE, STEPS-NL)
+    categoryNr  :
+        How many categories should be plotted
 
     Returns
     -------
@@ -248,18 +250,23 @@ def _get_colorlist(colorscale="pysteps", categoryNr=4):
     """
 
     if categoryNr < 1 or categoryNr > 6:
-        raise ValueError("Invalid category indexes [1 to 6] " + str(categoryNr))
+        raise ValueError("Invalid category index [1 to 6] " + str(categoryNr))
 
     if colorscale == "pysteps":
         color_list = ["#ffe38f", "#ceda86", "#009489", "#3897ed", "#b0a0dc", "#ec623b"]
-        clevs = [1, 2, 3, 4, 5, 6, 7]
-        clevs_str = ['Rain', 'Wet Snow', 'Snow', 'Freezing Rain', 'Hail', 'Severe Hail']
-        color_list = color_list[0:categoryNr]
-        clevs = clevs[0:(categoryNr + 1)]
-        clevs_str = clevs_str[0:categoryNr] + ['']
-    # elif colorscale == 'other color scale': ...
+    # elif colorscale == 'other color scale': ... [6 colors]
     else:
         print("Invalid colorscale", colorscale)
         raise ValueError("Invalid colorscale " + colorscale)
+
+    # Ticks and labels
+    clevs = [1, 2, 3, 4, 5, 6, 7]
+    clevs_str = ['Rain', 'Wet Snow', 'Snow', 'Freezing Rain', 'Hail', 'Severe Hail']
+
+    # filter by category number
+    color_list = color_list[0:categoryNr]
+    clevs = clevs[0:(categoryNr + 1)]
+    clevs_str = clevs_str[0:categoryNr] + ['']
+
 
     return color_list, clevs, clevs_str
