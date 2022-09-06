@@ -23,7 +23,7 @@ def inca_dictionary_to_3Dmatrix(incaDict):
 def plot_ptype(ptype_grid, metadata, i, date_time, dir_gif, categoryNr=4):
     title = 'Precipitation type ' + date_time.strftime("%Y-%m-%d %H:%M") #+ ' - ' + str(i)
     fig = plt.figure(figsize=(15, 15))
-    fig.add_subplot(1, 1, 1)
+    #fig.add_subplot(1, 1, 1)
     plot_precipType_field(ptype_grid, geodata=metadata, title=title, colorscale="pysteps", categoryNr=categoryNr)
     #plt.suptitle('Precipitation Type', fontsize=30)
     plt.tight_layout()
@@ -115,11 +115,11 @@ def grid_interpolation(numpyGridStart, numpyGridEnd, timeStep=5, timeBase=60):
     interpolationGrid = np.zeros((len(interPoints), numpyGridStart.shape[0], numpyGridStart.shape[1]))
     interpolationGrid[:, :, :] = np.nan
 
-    print('Calculating linear interpolation..', end=' ')
+    #print('Calculating linear interpolation..', end=' ')
     for i in range(len(interPoints)):
         interpolationGrid[i, :, :] = numpyGridStart + ((numpyGridEnd - numpyGridStart) / interPoints[-1]) * interPoints[
             i]
-    print('Done')
+    #print('Done')
 
     return interpolationGrid
 
@@ -224,19 +224,21 @@ def calculate_precip_type(incaZnow, incaTemp, incaGroundTemp, precipGrid, topogr
 
 
 def get_reprojected_indexes(reprojectedGrid):
-    """reprojected INCA grids contains a frame of NAN values, this function returns the start and end indexes
-    of the inca grid in the reprojected grid
+    """Reprojected INCA grids contains a frame of NAN values, this function returns the start and end indexes
+    of the inca grid over the reprojected grid
 
     reprojectedGrid:
         INCA reprojected Grid
 
+    ---
     Returns:
         x y indexes of inca reprojected grid over pysteps dimensions
     """
 
     x_start = np.where(~np.isnan(reprojectedGrid))[0][0]
-    x_end = np.where(~np.isnan(reprojectedGrid))[0][-1]
+    x_end = np.where(~np.isnan(reprojectedGrid))[0][-1] + 1
     y_start = np.where(~np.isnan(reprojectedGrid))[-1][0]
-    y_end = np.where(~np.isnan(reprojectedGrid))[-1][-1]
+    y_end = np.where(~np.isnan(reprojectedGrid))[-1][-1] + 1
 
     return x_start, x_end, y_start, y_end
+

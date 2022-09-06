@@ -7,6 +7,7 @@ import os
 import datetime
 import numpy as np
 import imageio
+import time
 
 from ptype_functions import *
 from IncaGribImport import IncaGribImporter
@@ -27,7 +28,7 @@ fn_tt = '_TT_FC_INCA.grb'
 fn_tg = '_TG_FC_INCA.grb'
 netCDF4Filename = r'C:\Users\talen\Desktop\Student JOB\Data\pysteps_blended_nowcast_20220108-09\blended_nowcast_202201090205.nc'
 topoFilename = r'C:\Users\talen\Desktop\Student JOB\Data\INCA-TOPO\inca_topo.asc'
-dir_gif = r'C:\Users\talen\Desktop\Student JOB\Data\gifs\membersTest'
+dir_gif = r'C:\Users\talen\Desktop\Student JOB\Data\gifs\membersTEST2'
 
 # GRIB import selection keys
 keys = ['Nx', 'Ny', 'latitudeOfFirstGridPointInDegrees', 'longitudeOfFirstGridPointInDegrees', 'earthIsOblate',
@@ -46,19 +47,26 @@ timeBase = 60
 timeStep = 5
 
 # ---------------------------------------------------------------------------
+# measure time
+start_time = time.time()
+
+
+# ---------------------------------------------------------------------------
 # Import ZS Snow level
+
 filename_ZS = os.path.join(gribPath, startdate.strftime("%Y%m%d%H%M") + fn_zs)
 importer = IncaGribImporter()
 incaDictionary_ZS = importer.retrieve_grib_data(filename=filename_ZS, metadata_keys=keys)
 
 # Transform to a 3D matrix
 R_inca_ZS = inca_dictionary_to_3Dmatrix(incaDictionary_ZS)
-print('INCA Snow level load ready')
+print('INCA Snow level load done')
 
 del (importer)
 
 # ---------------------------------------------------------------------------
 # Import TT Temperature
+
 filename_TT = os.path.join(gribPath, startdate.strftime("%Y%m%d%H%M") + fn_tt)
 importer = IncaGribImporter()
 incaDictionary_TT = importer.retrieve_grib_data(filename=filename_TT, metadata_keys=keys)
@@ -68,12 +76,13 @@ R_inca_TT = inca_dictionary_to_3Dmatrix(incaDictionary_TT)
 
 # Transform Kelvin to Celsius
 R_inca_TT[:, :, :] = R_inca_TT[:, :, :] - 273.15
-print('INCA temperature load ready')
+print('INCA temperature load done')
 
 del (importer)
 
 # ---------------------------------------------------------------------------
 # Import TG Ground temperature
+
 filename_TG = os.path.join(gribPath, startdate.strftime("%Y%m%d%H%M") + fn_tg)
 importer = IncaGribImporter()
 incaDictionary_TG = importer.retrieve_grib_data(filename=filename_TG, metadata_keys=keys)
@@ -83,10 +92,11 @@ R_inca_TG = inca_dictionary_to_3Dmatrix(incaDictionary_TG)
 
 # Transform Kelvin to Celsius
 R_inca_TG[:, :, :] = R_inca_TG[:, :, :] - 273.15
-print('INCA Ground temperature load ready')
+print('INCA Ground temperature load done')
 
 # ---------------------------------------------------------------------------
 # Build inca metadata
+
 metadata_inca = {}
 metadata_inca['projection'] = inca_projectionString
 metadata_inca['xpixelsize'] = incaDictionary_ZS['Metadata']['DxInMetres']
@@ -99,79 +109,112 @@ metadata_inca['yorigin'] = 'upper'
 
 # --------------------------------------------------------------------------
 # LOAD INCA TOPOGRAPHY (this might be a different file format in the future)
-inca_topo_grid = np.loadtxt(topoFilename)
-inca_topo_grid = inca_topo_grid[::-1, :]  # Reorientation
+
+topo_grid = np.loadtxt(topoFilename)
+topo_grid = topo_grid[::-1, :]  # Reorientation
 print('Topography load done')
 
-# --------------------------------------------------------------------------
 # Clean
 del importer, incaDictionary_ZS, incaDictionary_TT, incaDictionary_TG
 
 # ---------------------------------------------------------------------------
 # LOAD netCDF file
+
 # Set the filename and load file
 r_nwc, metadata_nwc = import_netcdf_pysteps(netCDF4Filename)
 metadata_nwc['projection'] = nwc_projectionString
 metadata_nwc['cartesian_unit'] = 'km'
-print('netCDF4 load done!')
+print('netCDF4 load done')
+
 
 # --------------------------------------------------------------------------
 # Reproject
-inca_reprojected_ZS, inca_metadata_reprojected = reproject_grids(R_inca_ZS, r_nwc[0, 0, :, :], metadata_inca,
-                                                                 metadata_nwc)
-inca_reprojected_TT, _ = reproject_grids(R_inca_TT, r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
-inca_reprojected_TG, _ = reproject_grids(R_inca_TG, r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
-topo_reprojected, _ = reproject_grids(np.array([inca_topo_grid]), r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
-print('Reprojection done!')
+
+R_inca_ZS, _ = reproject_grids(R_inca_ZS, r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
+R_inca_TT, _ = reproject_grids(R_inca_TT, r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
+R_inca_TG, _ = reproject_grids(R_inca_TG, r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
+
+# No need to reproject topography file (590x600)
+# topo_grid, _ = reproject_grids(np.array([topo_grid]), r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
+print('Reprojection done')
 
 # --------------------------------------------------------------------------
-# CROP (?)
-x1, x2, y1, y2 = get_reprojected_indexes(inca_reprojected_TT[0])
-# crop function ()
-print('Crop done!')
-
-
-# --------------------------------------------------------------------------
-# Diagnosis (Loop over available PYSTEPS timestamps)
-
 # Calculate interpolation matrices
-inca_interpolations_ZS, timestamps_idxs = generate_inca_interpolations(inca_reprojected_ZS, metadata_nwc['timestamps'], startdate, timeStep, timeBase)
-inca_interpolations_TT, _ = generate_inca_interpolations(inca_reprojected_TT, metadata_nwc['timestamps'], startdate, timeStep, timeBase)
-inca_interpolations_TG, _ = generate_inca_interpolations(inca_reprojected_TG, metadata_nwc['timestamps'], startdate, timeStep, timeBase)
+
+inca_interpolations_ZS, timestamps_idxs = generate_inca_interpolations(R_inca_ZS, metadata_nwc['timestamps'], startdate, timeStep, timeBase)
+inca_interpolations_TT, _ = generate_inca_interpolations(R_inca_TT, metadata_nwc['timestamps'], startdate, timeStep, timeBase)
+inca_interpolations_TG, _ = generate_inca_interpolations(R_inca_TG, metadata_nwc['timestamps'], startdate, timeStep, timeBase)
 print("Interpolation done!")
 
 # Clean (After interpolation, we don't need the reprojected data anymore)
-del inca_reprojected_ZS, inca_reprojected_TT, inca_reprojected_TG
+del R_inca_ZS, R_inca_TT, R_inca_TG
 
 # --------------------------------------------------------------------------
-# Members MEAN precipitation type over time
+# Diagnose precipitation type per member over time, using mean mask
 
-print("Calculate precipitation type over members mean...")
-filenames = []
+print("Calculate precipitation type per member over time...")
+
+# Find subscript indexes for INCA grid (590x600)
+x1, x2, y1, y2 = get_reprojected_indexes(inca_interpolations_ZS[0])
+
+# Result list
+ptype_list = np.zeros((r_nwc.shape[0] + 1, r_nwc.shape[1], x2 - x1, y2 - y1))
+
+# loop over timestamps
 for ts in range(len(timestamps_idxs)):
-    print("Calculating precipitation type at: ", str(timestamps_idxs[ts]))
+    print("Calculating precipitation types at: ", str(timestamps_idxs[ts]))
 
     # Members Mean matrix
-    r_nwc_mean = calculate_members_mean(r_nwc[:, ts, :, :])  # Input: Array of member grids
+    r_nwc_mean = calculate_members_mean(r_nwc[:, ts, x1:x2, y1:y2])
 
-    # calculate precipitation type result for the members mean
-    ptype_mean = calculate_precip_type(incaZnow=inca_interpolations_ZS[ts, :, :],
-                                       incaTemp=inca_interpolations_TT[ts, :, :],
-                                       incaGroundTemp=inca_interpolations_TG[ts, :, :],
+    # calculate precipitation type result with members mean
+    ptype_mean = calculate_precip_type(incaZnow=inca_interpolations_ZS[ts, x1:x2, y1:y2],
+                                       incaTemp=inca_interpolations_TT[ts, x1:x2, y1:y2],
+                                       incaGroundTemp=inca_interpolations_TG[ts, x1:x2, y1:y2],
                                        precipGrid=r_nwc_mean,
-                                       topographyGrid=topo_reprojected[0, :, :])
+                                       topographyGrid=topo_grid)
+    for member in range(r_nwc.shape[0]):
+        res = np.copy(ptype_mean)
+        res[r_nwc[member, ts, x1:x2, y1:y2] == 0] = 0
+        ptype_list[member, ts, :, :] = res
+
+    # Add Mean at the end
+    ptype_list[-1, ts, :, :] = ptype_mean
+
+print("--Script finished--")
+print("--- %s seconds ---" % (time.time() - start_time))
+
+
+# --------------------------------------------------------------------------
+# PLOT
+
+# WARNING (1): The grids have been cropped to a smaller size (INCA 590x600), this requires the inca_metadata to be use
+# for plotting. If the original pysteps grid size is used (700x700) for plotting, the pysteps metadata_nwc should be
+# used instead.
+#
+# WARNING (2): Topography original size is 590x600. This grid was not reprojected.
+
+# time
+start_time = time.time()
+
+filenames = []
+member = 1 # print the last one to test
+mean_idx = ptype_list.shape[0] - 1  # Last value is for members mean
+
+# Plot members
+for ts in range(len(timestamps_idxs)):
     # Plot
-    # print('Plotting members mean precipitation type...')
-    filenames.append(plot_ptype(ptype_mean, inca_metadata_reprojected, ts, timestamps_idxs[ts], dir_gif))
-    # here could be a list to store the results
+    filenames.append(plot_ptype(ptype_list[member, ts, :, :], metadata_inca, ts, timestamps_idxs[ts], dir_gif))
 
 # Build gif
 kargs = {'duration': 0.4}
-with imageio.get_writer(os.path.join(dir_gif, r'INCA_mem_mean_%s.gif' % (startdate.strftime('%Y%m%d%H%M'),)), mode='I',
-                            **kargs) as writer:
-        for filename in filenames:
-            image = imageio.imread_v2(os.path.join(dir_gif, filename))
-            writer.append_data(image)
+with imageio.get_writer(
+        os.path.join(dir_gif, (
+            r'INCA_mem_TEST' + ('mean_' if member == mean_idx else '') + str(member) + '_' + startdate.strftime('%Y%m%d%H%M') + '.gif')), mode='I',
+        **kargs) as writer:
+    for filename in filenames:
+        image = imageio.imread_v2(os.path.join(dir_gif, filename))
+        writer.append_data(image)
 
 # Close gif writer
 writer.close()
@@ -180,37 +223,8 @@ writer.close()
 for filename in set(filenames):
     os.remove(os.path.join(dir_gif, filename))
 
+print("--- %s seconds ---" % (time.time() - start_time))
 
-# --------------------------------------------------------------------------
-# Calculate precipitation type per member
-
-print("Calculate precipitation type per member...")
-filenames = []
-for mem in range(members):
-    for ts in range(len(timestamps_idxs)):
-        print("Calculating precipitation type at: ", str(timestamps_idxs[ts]), " for member : ", mem)
-        # Calculate precipitation type for each member
-        ptype_mem = calculate_precip_type(incaZnow=inca_interpolations_ZS[ts, :, :],
-                                          incaTemp=inca_interpolations_TT[ts, :, :],
-                                          incaGroundTemp=inca_interpolations_TG[ts, :, :],
-                                          precipGrid=r_nwc[mem, ts, :, :],
-                                          topographyGrid=topo_reprojected[0, :, :])
-        # Plot
-        filenames.append(plot_ptype(ptype_mem, inca_metadata_reprojected, ts, timestamps_idxs[ts], dir_gif))
-
-    # Build gif
-    kargs = {'duration': 0.4}
-    with imageio.get_writer(os.path.join(dir_gif, (r'INCA_mem_' + str(mem) + '_' + startdate.strftime('%Y%m%d%H%M') + '.gif')), mode='I', **kargs) as writer:
-        for filename in filenames:
-            image = imageio.imread_v2(os.path.join(dir_gif, filename))
-            writer.append_data(image)
-
-    # Close gif writer
-    writer.close()
-
-    # Remove temporary files
-    for filename in set(filenames):
-        os.remove(os.path.join(dir_gif, filename))
-
-# done
-print("--Script finished--")
+# test plots
+# plot_ptype(np.array(ptype_mean), metadata_inca, 0, timestamps_idxs[0], dir_gif)
+# plot_ptype(np.array(res), metadata_inca, 0, timestamps_idxs[0], dir_gif)

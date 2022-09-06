@@ -240,3 +240,76 @@ for mem in range(r_nwc.shape[0]):
                                           topographyGrid=topo_reprojected[0, :, :])
         # Plot
         filenames.append(plot_ptype(ptype_mem, inca_metadata_reprojected, ts, startdate, dir_gif))
+
+
+# ------- SAVE
+
+# --------------------------------------------------------------------------
+# Members MEAN precipitation type over time
+#
+# print("Calculate precipitation type over members mean...")
+# filenames = []
+# for ts in range(len(timestamps_idxs)):
+#     print("Calculating precipitation type at: ", str(timestamps_idxs[ts]))
+#
+#     # Members Mean matrix
+#     r_nwc_mean = calculate_members_mean(r_nwc[:, ts, :, :])  # Input: Array of member grids
+#
+#     # calculate precipitation type result for the members mean
+#     ptype_mean = calculate_precip_type(incaZnow=inca_interpolations_ZS[ts, :, :],
+#                                        incaTemp=inca_interpolations_TT[ts, :, :],
+#                                        incaGroundTemp=inca_interpolations_TG[ts, :, :],
+#                                        precipGrid=r_nwc_mean,
+#                                        topographyGrid=topo_reprojected[0, :, :])
+#     # Plot
+#     # print('Plotting members mean precipitation type...')
+#     filenames.append(plot_ptype(ptype_mean, inca_metadata_reprojected, ts, timestamps_idxs[ts], dir_gif))
+#     # here could be a list to store the results
+#
+# # Build gif
+# kargs = {'duration': 0.4}
+# with imageio.get_writer(os.path.join(dir_gif, r'INCA_mem_mean_%s.gif' % (startdate.strftime('%Y%m%d%H%M'),)), mode='I',
+#                             **kargs) as writer:
+#         for filename in filenames:
+#             image = imageio.imread_v2(os.path.join(dir_gif, filename))
+#             writer.append_data(image)
+#
+# # Close gif writer
+# writer.close()
+#
+# # Remove temporary files
+# for filename in set(filenames):
+#     os.remove(os.path.join(dir_gif, filename))
+
+
+# --------------------------------------------------------------------------
+# Calculate precipitation type per member
+#
+# print("Calculate precipitation type per member...")
+# filenames = []
+# for mem in range(members):
+#     for ts in range(len(timestamps_idxs)):
+#         print("Calculating precipitation type at: ", str(timestamps_idxs[ts]), " for member : ", mem)
+#         # Calculate precipitation type for each member
+#         ptype_mem = calculate_precip_type(incaZnow=inca_interpolations_ZS[ts, :, :],
+#                                           incaTemp=inca_interpolations_TT[ts, :, :],
+#                                           incaGroundTemp=inca_interpolations_TG[ts, :, :],
+#                                           precipGrid=r_nwc[mem, ts, :, :],
+#                                           topographyGrid=topo_reprojected[0, :, :])
+#         # Plot
+#         filenames.append(plot_ptype(ptype_mem, inca_metadata_reprojected, ts, timestamps_idxs[ts], dir_gif))
+#
+#     # Build gif
+#     kargs = {'duration': 0.4}
+#     with imageio.get_writer(os.path.join(dir_gif, (r'INCA_mem_' + str(mem) + '_' + startdate.strftime('%Y%m%d%H%M') + '.gif')), mode='I', **kargs) as writer:
+#         for filename in filenames:
+#             image = imageio.imread_v2(os.path.join(dir_gif, filename))
+#             writer.append_data(image)
+#
+#     # Close gif writer
+#     writer.close()
+#
+#     # Remove temporary files
+#     for filename in set(filenames):
+#         os.remove(os.path.join(dir_gif, filename))
+
