@@ -94,6 +94,8 @@ R_inca_TG = inca_dictionary_to_3Dmatrix(incaDictionary_TG)
 R_inca_TG[:, :, :] = R_inca_TG[:, :, :] - 273.15
 print('INCA Ground temperature load done')
 
+del (importer)
+
 # ---------------------------------------------------------------------------
 # Build inca metadata
 
@@ -108,22 +110,24 @@ metadata_inca['y2'] = 940000.0
 metadata_inca['yorigin'] = 'upper'
 
 # --------------------------------------------------------------------------
-# LOAD INCA TOPOGRAPHY (this might be a different file format in the future)
+# Load INCA Topography (this might be a different file format in the future)
 
 topo_grid = np.loadtxt(topoFilename)
 topo_grid = topo_grid[::-1, :]  # Reorientation
 print('Topography load done')
 
 # Clean
-del importer, incaDictionary_ZS, incaDictionary_TT, incaDictionary_TG
+del incaDictionary_ZS, incaDictionary_TT, incaDictionary_TG
 
 # ---------------------------------------------------------------------------
-# LOAD netCDF file
+# Load PYSTEPS data
 
-# Set the filename and load file
+# import netCDF file
 r_nwc, metadata_nwc = import_netcdf_pysteps(netCDF4Filename)
+
+# Set Metadata info
 metadata_nwc['projection'] = nwc_projectionString
-metadata_nwc['cartesian_unit'] = 'km'
+metadata_nwc['cartesian_unit'] = 'm'
 print('netCDF4 load done')
 
 
@@ -149,8 +153,15 @@ print("Interpolation done!")
 # Clean (After interpolation, we don't need the reprojected data anymore)
 del R_inca_ZS, R_inca_TT, R_inca_TG
 
+
 # --------------------------------------------------------------------------
 # Diagnose precipitation type per member over time, using mean mask
+
+# WARNING (1): The grids have sub-scripted to a smaller size (INCA 590x600). This requires the inca_metadata to be use
+# for plotting. If the original PYSTEPS grid size is used (700x700) for plotting, the pysteps metadata_nwc should be
+# used instead.
+#
+# WARNING (2): Topography original size is 590x600. This grid was not reprojected.
 
 print("Calculate precipitation type per member over time...")
 
@@ -186,22 +197,18 @@ print("--- %s seconds ---" % (time.time() - start_time))
 
 
 # --------------------------------------------------------------------------
-# PLOT
+# PLOT (single member over time)
 
-# WARNING (1): The grids have been cropped to a smaller size (INCA 590x600), this requires the inca_metadata to be use
-# for plotting. If the original pysteps grid size is used (700x700) for plotting, the pysteps metadata_nwc should be
-# used instead.
-#
-# WARNING (2): Topography original size is 590x600. This grid was not reprojected.
-
-# time
+# measure time
 start_time = time.time()
 
-filenames = []
-member = 1 # print the last one to test
-mean_idx = ptype_list.shape[0] - 1  # Last value is for members mean
+# Choose 1 member to plot
+member = 0
+# Members mean is always stored at the last index (used in file name only)
+mean_idx = ptype_list.shape[0] - 1
 
 # Plot members
+filenames = []
 for ts in range(len(timestamps_idxs)):
     # Plot
     filenames.append(plot_ptype(ptype_list[member, ts, :, :], metadata_inca, ts, timestamps_idxs[ts], dir_gif))
@@ -210,7 +217,7 @@ for ts in range(len(timestamps_idxs)):
 kargs = {'duration': 0.4}
 with imageio.get_writer(
         os.path.join(dir_gif, (
-            r'INCA_mem_TEST' + ('mean_' if member == mean_idx else '') + str(member) + '_' + startdate.strftime('%Y%m%d%H%M') + '.gif')), mode='I',
+            r'INCA_mem_' + ('mean_' if member == mean_idx else '') + str(member) + '_' + startdate.strftime('%Y%m%d%H%M') + '.gif')), mode='I',
         **kargs) as writer:
     for filename in filenames:
         image = imageio.imread_v2(os.path.join(dir_gif, filename))
@@ -223,8 +230,10 @@ writer.close()
 for filename in set(filenames):
     os.remove(os.path.join(dir_gif, filename))
 
+print("--- finished plotting ---")
 print("--- %s seconds ---" % (time.time() - start_time))
+
 
 # test plots
 # plot_ptype(np.array(ptype_mean), metadata_inca, 0, timestamps_idxs[0], dir_gif)
-# plot_ptype(np.array(res), metadata_inca, 0, timestamps_idxs[0], dir_gif)
+# plot_ptype(np.array(R_inca_ZS[0]), metadata_inca, 0, timestamps_idxs[0], dir_gif)
