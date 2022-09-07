@@ -149,8 +149,8 @@ def generate_inca_interpolations(inca_reprojected_data, nwc_timestamps, startdat
     # Convert metadata_nwc['timestamps'] to datetime
     nwc_ts = [datetime.datetime.strptime(ts.strftime(dateFormat), dateFormat) for ts in nwc_timestamps]
 
-    inca_start = np.where(inca_timestamps == nwc_ts[0])[0][0]  # this is not safe add an IF check .shape[0]
-    inca_end = np.where(inca_timestamps == nwc_ts[-1])[0][0] + 1  # this is not safe
+    inca_start = np.where(inca_timestamps == nwc_ts[0])[0][0]
+    inca_end = np.where(inca_timestamps == nwc_ts[-1])[0][0] + 1
     timestamp_selection = inca_timestamps[inca_start:inca_end]  # to be returned
 
     # interpolation indexes
@@ -168,11 +168,12 @@ def generate_inca_interpolations(inca_reprojected_data, nwc_timestamps, startdat
                 resultMatrix[result_idx, :, :] = interpolationMatrix[interp_idx, :, :]
                 result_idx = result_idx + 1
                 interp_idx = interp_idx + 1
+            result_idx = result_idx - 1  # overwrite the last value
 
     return resultMatrix[inca_start:], timestamp_selection
 
-# inca_reprojected_data[1,60:62, 60:62] == resultMatrix[12, 60:62, 60:62]
-
+# test
+# inca_reprojected_data[3,65,65] == resultMatrix[36,65,65]
 
 def calculate_precip_type(incaZnow, incaTemp, incaGroundTemp, precipGrid, topographyGrid, DZML=100., TT0=2., TG0=0.,
                           RRMIN=0):

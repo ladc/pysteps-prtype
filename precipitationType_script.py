@@ -97,7 +97,7 @@ print('INCA Ground temperature load done')
 del (importer)
 
 # ---------------------------------------------------------------------------
-# Build inca metadata
+# Build inca metadata (this should be an output of the INCA importer)
 
 metadata_inca = {}
 metadata_inca['projection'] = inca_projectionString
@@ -203,7 +203,7 @@ print("--- %s seconds ---" % (time.time() - start_time))
 start_time = time.time()
 
 # Choose 1 member to plot
-member = 0
+member = 2
 # Members mean is always stored at the last index (used in file name only)
 mean_idx = ptype_list.shape[0] - 1
 
