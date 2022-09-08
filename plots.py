@@ -32,13 +32,9 @@ def worker(gridPlot, metadata, i, start_date, dirGif):
 
 startdate = datetime.datetime.strptime('202201090210', "%Y%m%d%H%M")
 filename = r'C:\Users\talen\Desktop\Student JOB\Data\INCA-BE example files\09\precip\PT_FC_INCA.grb'
-netCDF4Filename = r'C:\Users\talen\Desktop\Student JOB\Data\pysteps_blended_nowcast_20220108-09\blended_nowcast_202201090205.nc'
 
 dir_gif = r'C:\Users\talen\Desktop\Student JOB\Data\gifs\\membersTEST2'
 
-# Keys to extract from the GRIB messages
-keys = ['Nx', 'Ny', 'latitudeOfFirstGridPointInDegrees', 'longitudeOfFirstGridPointInDegrees', 'earthIsOblate',
-        'LoVInDegrees', 'DxInMetres', 'DyInMetres', 'iScansNegatively', 'jScansPositively', 'Latin1InDegrees', 'Latin2InDegrees']
 projectionString = '+proj=lcc +lat_1=49.83333333333334 +lat_2=51.16666666666666 +lat_0=50.797815 +lon_0=4.359215833333333 +x_0=649328 +y_0=665262 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
 
 # Import GRIB

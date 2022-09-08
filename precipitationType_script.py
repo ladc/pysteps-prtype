@@ -18,16 +18,18 @@ from pysteps.io import import_netcdf_pysteps
 # --------------------------------------------------------------------------
 # Parameters
 
-# Date
+# Start date and time
 startdate = datetime.datetime.strptime('202201090200', "%Y%m%d%H%M")
 
-# File paths
+# File paths and names
 gribPath = r'C:\Users\talen\Desktop\Student JOB\Data\INCA-BE example files\09\basic'
 fn_zs = '_ZS_FC_INCA.grb'
 fn_tt = '_TT_FC_INCA.grb'
 fn_tg = '_TG_FC_INCA.grb'
 netCDF4Filename = r'C:\Users\talen\Desktop\Student JOB\Data\pysteps_blended_nowcast_20220108-09\blended_nowcast_202201090205.nc'
 topoFilename = r'C:\Users\talen\Desktop\Student JOB\Data\INCA-TOPO\inca_topo.asc'
+
+# GIF output folder
 dir_gif = r'C:\Users\talen\Desktop\Student JOB\Data\gifs\membersTEST2'
 
 # GRIB import selection keys
@@ -46,10 +48,6 @@ members = 1
 timeBase = 60
 timeStep = 5
 
-# ---------------------------------------------------------------------------
-# measure time
-start_time = time.time()
-
 
 # ---------------------------------------------------------------------------
 # Import ZS Snow level
@@ -62,7 +60,7 @@ incaDictionary_ZS = importer.retrieve_grib_data(filename=filename_ZS, metadata_k
 R_inca_ZS = inca_dictionary_to_3Dmatrix(incaDictionary_ZS)
 print('INCA Snow level load done')
 
-del (importer)
+del importer
 
 # ---------------------------------------------------------------------------
 # Import TT Temperature
@@ -78,7 +76,7 @@ R_inca_TT = inca_dictionary_to_3Dmatrix(incaDictionary_TT)
 R_inca_TT[:, :, :] = R_inca_TT[:, :, :] - 273.15
 print('INCA temperature load done')
 
-del (importer)
+del importer
 
 # ---------------------------------------------------------------------------
 # Import TG Ground temperature
@@ -94,7 +92,7 @@ R_inca_TG = inca_dictionary_to_3Dmatrix(incaDictionary_TG)
 R_inca_TG[:, :, :] = R_inca_TG[:, :, :] - 273.15
 print('INCA Ground temperature load done')
 
-del (importer)
+del importer
 
 # ---------------------------------------------------------------------------
 # Build inca metadata (this should be an output of the INCA importer)
@@ -130,10 +128,14 @@ metadata_nwc['projection'] = nwc_projectionString
 metadata_nwc['cartesian_unit'] = 'm'
 print('netCDF4 load done')
 
+# ---------------------------------------------------------------------------
+# measure time
+start_time = time.time()
 
 # --------------------------------------------------------------------------
 # Reproject
 
+# INCA files reprojection over pySTEPS grid
 R_inca_ZS, _ = reproject_grids(R_inca_ZS, r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
 R_inca_TT, _ = reproject_grids(R_inca_TT, r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
 R_inca_TG, _ = reproject_grids(R_inca_TG, r_nwc[0, 0, :, :], metadata_inca, metadata_nwc)
@@ -145,6 +147,7 @@ print('Reprojection done')
 # --------------------------------------------------------------------------
 # Calculate interpolation matrices
 
+# Calculate interpolations values for matching timestamps between INCA and pySTEPS
 inca_interpolations_ZS, timestamps_idxs = generate_inca_interpolations(R_inca_ZS, metadata_nwc['timestamps'], startdate, timeStep, timeBase)
 inca_interpolations_TT, _ = generate_inca_interpolations(R_inca_TT, metadata_nwc['timestamps'], startdate, timeStep, timeBase)
 inca_interpolations_TG, _ = generate_inca_interpolations(R_inca_TG, metadata_nwc['timestamps'], startdate, timeStep, timeBase)
@@ -157,7 +160,7 @@ del R_inca_ZS, R_inca_TT, R_inca_TG
 # --------------------------------------------------------------------------
 # Diagnose precipitation type per member over time, using mean mask
 
-# WARNING (1): The grids have sub-scripted to a smaller size (INCA 590x600). This requires the inca_metadata to be use
+# WARNING (1): The grids have been sub-scripted to a smaller size (INCA 590x600). This requires the inca_metadata to be use
 # for plotting. If the original PYSTEPS grid size is used (700x700) for plotting, the pysteps metadata_nwc should be
 # used instead.
 #
@@ -184,12 +187,14 @@ for ts in range(len(timestamps_idxs)):
                                        incaGroundTemp=inca_interpolations_TG[ts, x1:x2, y1:y2],
                                        precipGrid=r_nwc_mean,
                                        topographyGrid=topo_grid)
+
+    # Intersect precipitation type by member using ptype_mean
     for member in range(r_nwc.shape[0]):
         res = np.copy(ptype_mean)
         res[r_nwc[member, ts, x1:x2, y1:y2] == 0] = 0
         ptype_list[member, ts, :, :] = res
 
-    # Add Mean at the end
+    # Add mean result at the end
     ptype_list[-1, ts, :, :] = ptype_mean
 
 print("--Script finished--")
@@ -203,8 +208,8 @@ print("--- %s seconds ---" % (time.time() - start_time))
 start_time = time.time()
 
 # Choose 1 member to plot
-member = 2
-# Members mean is always stored at the last index (used in file name only)
+member = 0
+# Members mean is always stored at the last index (used for the file name only)
 mean_idx = ptype_list.shape[0] - 1
 
 # Plot members

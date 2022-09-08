@@ -1,16 +1,12 @@
 # Import
-from IncaGribImport import IncaGribImporter
-
 import os
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
-
-from pysteps.visualization import plot_precip_field, quiver
 from visualization.precipitationTypeFields import plot_precipType_field
 
 
-# Dictionary to matrix function
+# Dictionary to matrix function (this can be added to the importer class)
 def inca_dictionary_to_3Dmatrix(incaDict):
     resultMatrix = np.empty(shape=(
         len(incaDict['Messages'].keys()), incaDict['Messages'][1]['Grid'].shape[0],
@@ -21,7 +17,7 @@ def inca_dictionary_to_3Dmatrix(incaDict):
 
 
 def plot_ptype(ptype_grid, metadata, i, date_time, dir_gif, categoryNr=4):
-    title = 'Precipitation type ' + date_time.strftime("%Y-%m-%d %H:%M") #+ ' - ' + str(i)
+    title = 'Precipitation type ' + date_time.strftime("%Y-%m-%d %H:%M")
     fig = plt.figure(figsize=(15, 15))
     #fig.add_subplot(1, 1, 1)
     plot_precipType_field(ptype_grid, geodata=metadata, title=title, colorscale="pysteps", categoryNr=categoryNr)
@@ -163,7 +159,7 @@ def generate_inca_interpolations(inca_reprojected_data, nwc_timestamps, startdat
             # calculate interpolations
             interpolationMatrix = grid_interpolation(inca_reprojected_data[m-1], inca_reprojected_data[m], timeStep=timeStep, timeBase=timeBase)
             interp_idx = 0
-            # Add the interpolation values to the result matrix
+            # Add the interpolation values to the result matrix (this assignment can be done without looping...)
             while interp_idx < interpolationMatrix.shape[0] and (result_idx < resultMatrix.shape[0]):
                 resultMatrix[result_idx, :, :] = interpolationMatrix[interp_idx, :, :]
                 result_idx = result_idx + 1
